@@ -1,24 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookCheck, BookOpen, CheckCircle2, FileText, Inbox } from "lucide-react";
-import { useApp } from "@/context/AppContext";
-import type { Book, BookRequestInput, ReadingStatus } from "@/types";
+import { BookOpenCheck, FileText, Flame, Inbox, Star } from "lucide-react";
+import { useStudent } from "@/context/AppContext";
+import { getLeaderboard, getStudentStats } from "@/lib/stats";
+import type { BookRequestInput, ReadingStatus } from "@/types";
+import { Leaderboard } from "@/components/dashboard/leaderboard";
+import { AchievementsCard } from "@/components/student/achievements-card";
 import { BookCard } from "@/components/student/book-card";
+import { ReadingTimer } from "@/components/student/reading-timer";
+import { StreakCard } from "@/components/student/streak-card";
 import { SuggestBookForm } from "@/components/student/suggest-book-form";
-import { Card, EmptyState, PageHeader, ProgressRing, SegmentedTabs, StatCard, type TabOption } from "@/components/ui";
+import { Alert, Card, EmptyState, PageHeader, ProgressRing, SegmentedTabs, StatCard, type TabOption } from "@/components/ui";
 
 type Filter = "all" | ReadingStatus;
 
-const INITIAL_BOOKS: Book[] = [
-  { id: 1, title: "لاعب الشطرنج", author: "ستيفان زفايغ", pages: 90, category: "رواية قصيرة", status: "completed", addedBy: "system", note: "رواية عميقة تنافس النفس البشرية في العزلة والتركيز.", rating: 5 },
-  { id: 2, title: "الإنسان يبحث عن معنى", author: "فيكتور فرانكل", pages: 120, category: "فلسفة وتنمية", status: "reading", addedBy: "system" },
-  { id: 3, title: "المعطف", author: "نيكولاي غوغول", pages: 70, category: "أدب عالمي", status: "want_to_read", addedBy: "system" },
-];
-
 export default function StudentDashboard() {
-  const { addBookRequest } = useApp();
-  const [books, setBooks] = useState<Book[]>(INITIAL_BOOKS);
+  const { db, student, actions } = useStudent();
   const [filter, setFilter] = useState<Filter>("all");
   const [toast, setToast] = useState("");
 
@@ -28,19 +26,13 @@ export default function StudentDashboard() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const updateBook = (id: number, patch: Partial<Book>) =>
-    setBooks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  const stats = getStudentStats(student, db.requests);
+  const rank = getLeaderboard(db).find((e) => e.student.id === student.id)?.rank;
+  const requestStatus = new Map(db.requests.map((r) => [r.id, r.status]));
 
-  const handleSuggest = (input: BookRequestInput) => {
-    setBooks((prev) => [{ ...input, id: Date.now(), status: "want_to_read", addedBy: "student" }, ...prev]);
-    addBookRequest(input);
-    setToast("تم إرسال المقترح بنجاح إلى لوحة المعلم للاعتماد!");
-  };
-
+  const { books } = student;
   const count = (s: ReadingStatus) => books.filter((b) => b.status === s).length;
-  const completed = books.filter((b) => b.status === "completed");
-  const pagesRead = completed.reduce((sum, b) => sum + b.pages, 0);
-  const progress = Math.round((completed.length / (books.length || 1)) * 100);
+  const progress = Math.round((stats.completedBooks / (books.length || 1)) * 100);
   const visible = filter === "all" ? books : books.filter((b) => b.status === filter);
 
   const tabs: TabOption<Filter>[] = [
@@ -50,19 +42,24 @@ export default function StudentDashboard() {
     { value: "want_to_read", label: "للقائمة", count: count("want_to_read") },
   ];
 
+  const handleSuggest = (input: BookRequestInput) => {
+    actions.addBookRequest(input);
+    setToast("تم إرسال المقترح بنجاح إلى لوحة المعلم للاعتماد!");
+  };
+
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="لوحة الطالب"
+        eyebrow={`مرحباً ${student.name} 👋`}
         title="مسارك القرائي"
-        description="تابع كتبك، سجّل أفكارك واقتباساتك، وأرسل مقترحاتك مباشرة إلى معلمك."
+        description="اقرأ بالمؤقت، حافظ على أيام التتابع، واجمع الميداليات لتتصدّر لوحة الصدارة."
         actions={
           <Card className="flex items-center gap-4 px-4 py-3">
-            <ProgressRing value={progress} size={56} label="نسبة الإنجاز" />
+            <ProgressRing value={progress} size={56} label="نسبة إنجاز الكتب" />
             <div>
-              <p className="text-xs text-muted">مؤشر التقدم</p>
+              <p className="text-xs text-muted">الكتب المنجزة</p>
               <p className="text-sm font-bold text-foreground">
-                {completed.length} من {books.length} كتب
+                {stats.completedBooks} من {books.length} كتب
               </p>
             </div>
           </Card>
@@ -70,19 +67,22 @@ export default function StudentDashboard() {
       />
 
       <section aria-label="إحصاءات" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="الكتب المنجزة" value={completed.length} icon={CheckCircle2} tone="success" />
-        <StatCard label="قيد القراءة" value={count("reading")} icon={BookOpen} tone="info" />
-        <StatCard label="في القائمة" value={count("want_to_read")} icon={BookCheck} tone="warning" />
-        <StatCard label="الصفحات المقروءة" value={pagesRead} icon={FileText} tone="primary" />
+        <StatCard label="أيام التتابع" value={stats.currentStreak} icon={Flame} tone="warning" hint={`الأطول: ${stats.longestStreak}`} />
+        <StatCard label="الكتب المنجزة" value={stats.completedBooks} icon={BookOpenCheck} tone="success" />
+        <StatCard label="الصفحات المقروءة" value={stats.pagesRead} icon={FileText} tone="info" />
+        <StatCard label="النقاط" value={stats.points} icon={Star} tone="primary" hint={rank ? `المركز ${rank} من ${db.students.length}` : undefined} />
       </section>
 
-      <div role="status" aria-live="polite">
-        {toast && (
-          <p className="animate-fade-in rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm font-semibold text-success">
-            {toast}
-          </p>
-        )}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <ReadingTimer studentId={student.id} minutesToday={stats.minutesToday} onSave={actions.logReadingSession} />
+        </div>
+        <StreakCard sessions={student.sessions} currentStreak={stats.currentStreak} longestStreak={stats.longestStreak} />
       </div>
+
+      <AchievementsCard stats={stats} />
+
+      {toast && <Alert tone="success">{toast}</Alert>}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section aria-labelledby="books-heading" className="space-y-4 lg:col-span-2">
@@ -101,9 +101,10 @@ export default function StudentDashboard() {
                 <BookCard
                   key={book.id}
                   book={book}
-                  onStatusChange={(status) => updateBook(book.id, { status })}
-                  onRate={(rating) => updateBook(book.id, { rating })}
-                  onSaveNote={(note) => updateBook(book.id, { note: note || undefined })}
+                  requestStatus={book.requestId ? requestStatus.get(book.requestId) : undefined}
+                  onStatusChange={(status) => actions.updateBook(book.id, { status })}
+                  onRate={(rating) => actions.updateBook(book.id, { rating })}
+                  onSaveNote={(note) => actions.updateBook(book.id, { note: note || undefined })}
                 />
               ))}
             </div>
@@ -114,6 +115,8 @@ export default function StudentDashboard() {
           <SuggestBookForm onSubmit={handleSuggest} />
         </aside>
       </div>
+
+      <Leaderboard />
     </div>
   );
 }

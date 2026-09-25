@@ -2,19 +2,21 @@
 
 import { useState } from "react";
 import { PencilLine, Quote, Star } from "lucide-react";
-import type { Book, ReadingStatus } from "@/types";
-import { READING_STATUS } from "@/lib/constants";
+import type { Book, ReadingStatus, RequestStatus } from "@/types";
+import { READING_STATUS, REQUEST_STATUS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, Input, Select } from "@/components/ui";
 
 interface BookCardProps {
   book: Book;
+  /** Approval state when the student suggested this book. */
+  requestStatus?: RequestStatus;
   onStatusChange: (status: ReadingStatus) => void;
   onRate: (rating: number) => void;
   onSaveNote: (note: string) => void;
 }
 
-export function BookCard({ book, onStatusChange, onRate, onSaveNote }: BookCardProps) {
+export function BookCard({ book, requestStatus, onStatusChange, onRate, onSaveNote }: BookCardProps) {
   const [editingNote, setEditingNote] = useState(false);
   const [draft, setDraft] = useState(book.note ?? "");
 
@@ -29,9 +31,13 @@ export function BookCard({ book, onStatusChange, onRate, onSaveNote }: BookCardP
         <div className="min-w-0 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-bold text-foreground">{book.title}</h3>
-            <Badge tone={book.addedBy === "student" ? "warning" : "primary"}>
-              {book.addedBy === "student" ? "مضاف شخصياً" : "قائمة رسمية"}
-            </Badge>
+            {requestStatus ? (
+              <Badge tone={REQUEST_STATUS[requestStatus].tone} dot>
+                مقترح • {REQUEST_STATUS[requestStatus].label}
+              </Badge>
+            ) : (
+              <Badge tone="primary">قائمة رسمية</Badge>
+            )}
           </div>
           <p className="text-xs text-muted">
             {book.author} • {book.pages} صفحة • {book.category}

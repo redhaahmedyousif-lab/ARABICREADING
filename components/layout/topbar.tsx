@@ -5,6 +5,7 @@ import { Bell, Menu, Search } from "lucide-react";
 import { NAV_ITEMS, isActivePath } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
+import { UserMenu } from "./user-menu";
 
 interface TopbarProps {
   sidebarOpen: boolean;
@@ -49,9 +50,7 @@ export function Topbar({ sidebarOpen, onMenuClick }: TopbarProps) {
 
         <ThemeToggle />
 
-        <div className="ms-1 grid size-9 place-items-center rounded-full bg-gradient-to-br from-sky-400 to-indigo-500 text-xs font-bold text-white">
-          RJ
-        </div>
+        <UserMenu />
       </div>
     </header>
   );

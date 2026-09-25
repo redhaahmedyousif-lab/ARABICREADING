@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X } from "lucide-react";
-import { NAV_SECTIONS, isActivePath } from "@/lib/navigation";
+import { Flame, Inbox, X } from "lucide-react";
+import { useApp } from "@/context/AppContext";
+import { navForRole, isActivePath } from "@/lib/navigation";
+import { currentStreak } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Logo } from "./logo";
@@ -19,6 +21,8 @@ interface SidebarProps {
  */
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { role } = useApp();
+  const sections = role ? navForRole(role) : [];
 
   return (
     <>
@@ -47,7 +51,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </div>
 
         <nav aria-label="التنقل الرئيسي" className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
-          {NAV_SECTIONS.map((section) => (
+          {sections.map((section) => (
             <div key={section.title} className="space-y-1">
               <p className="px-3 pb-1 text-[11px] font-semibold tracking-wide text-subtle">{section.title}</p>
               {section.items.map(({ href, label, icon: Icon }) => {
@@ -80,14 +84,30 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           ))}
         </nav>
 
-        <div className="m-3 rounded-2xl border border-border bg-surface-muted p-4">
-          <p className="text-sm font-bold text-foreground">تحدي هذا الفصل</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">اقرأ ١٠ كتب قصيرة قبل نهاية الفصل الدراسي.</p>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border">
-            <div className="h-full w-1/3 rounded-full bg-primary" />
-          </div>
-        </div>
+        <SidebarCard />
       </aside>
     </>
+  );
+}
+
+function SidebarCard() {
+  const { ready, db, currentStudent, role } = useApp();
+  if (!ready || !role) return null;
+
+  const [Icon, title, body] =
+    role === "student" && currentStudent
+      ? [Flame, `${currentStreak(currentStudent.sessions)} أيام تتابع`, "اقرأ اليوم لتحافظ على سلسلتك."]
+      : [Inbox, `${db.requests.filter((r) => r.status === "pending").length} طلبات معلقة`, "مقترحات الطلاب بانتظار مراجعتك."];
+
+  return (
+    <div className="m-3 flex items-start gap-3 rounded-2xl border border-border bg-surface-muted p-4">
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-warning-soft text-warning">
+        <Icon className="size-5" aria-hidden />
+      </span>
+      <div>
+        <p className="text-sm font-bold text-foreground">{title}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted">{body}</p>
+      </div>
+    </div>
   );
 }

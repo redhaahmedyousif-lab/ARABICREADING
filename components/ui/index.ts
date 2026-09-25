@@ -7,3 +7,6 @@ export * from "./page-header";
 export * from "./progress-ring";
 export * from "./stat-card";
 export * from "./tabs";
+export * from "./password-input";
+export * from "./alert";
+export * from "./copy-button";

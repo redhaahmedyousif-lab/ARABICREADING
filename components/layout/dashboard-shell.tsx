@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { PageSkeleton } from "./page-skeleton";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 
@@ -36,7 +38,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-dvh flex-col lg:ps-72">
         <Topbar sidebarOpen={sidebarOpen} onMenuClick={() => setSidebarOpen(true)} />
         <main id="main-content" className="flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-          <div className="mx-auto w-full max-w-7xl">{children}</div>
+          <div className="mx-auto w-full max-w-7xl">
+            <AuthGuard fallback={<PageSkeleton />}>{children}</AuthGuard>
+          </div>
         </main>
         <footer className="border-t border-border px-4 py-5 text-xs text-subtle sm:px-6 lg:px-8">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2">

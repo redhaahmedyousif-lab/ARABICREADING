@@ -1,71 +1,39 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import type { BookRequest, BookRequestInput, RequestStatus } from "@/types";
+import { createContext, useContext, useMemo, useSyncExternalStore } from "react";
+import type { Database, Role, Session, Student } from "@/types";
+import { getServerSnapshot, getSnapshot, subscribe } from "@/lib/store/db";
+import * as actions from "@/lib/store/actions";
 
-interface AppContextValue {
-  requests: BookRequest[];
-  addBookRequest: (input: BookRequestInput) => void;
-  updateBookStatus: (id: number, status: RequestStatus) => void;
-}
+type LoadedState = {
+  ready: true;
+  db: Database;
+  session: Session | null;
+  role: Role | null;
+  /** The signed-in student, or null for teachers / signed-out users. */
+  currentStudent: Student | null;
+};
+
+type AppContextValue = (LoadedState | { ready: false; db: null; session: null; role: null; currentStudent: null }) & {
+  actions: typeof actions;
+};
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-// Placeholder student until authentication is wired in.
-const CURRENT_STUDENT = "الطالب الحالي";
-
-const INITIAL_REQUESTS: BookRequest[] = [
-  {
-    id: 1,
-    title: "عبقرية محمد",
-    author: "عباس محمود العقاد",
-    pages: 180,
-    category: "سيرة",
-    studentName: "سارة أحمد",
-    status: "pending",
-    createdAt: "2026-09-20",
-  },
-  {
-    id: 2,
-    title: "الشيخ والبحر",
-    author: "إرنست همنغواي",
-    pages: 110,
-    category: "أدب عالمي",
-    studentName: "يوسف علي",
-    status: "approved",
-    createdAt: "2026-09-18",
-  },
-];
-
 /**
- * Client-side store for book requests shared between the student and teacher
- * dashboards. Swap the state for server actions / an API when a backend exists;
- * the context shape is the integration seam.
+ * Exposes the persisted store (accounts, books, sessions, requests) and the
+ * current auth session. `ready` is false during SSR and until localStorage has
+ * been read — render a placeholder until then.
  */
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [requests, setRequests] = useState<BookRequest[]>(INITIAL_REQUESTS);
+  const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  const addBookRequest = useCallback((input: BookRequestInput) => {
-    setRequests((prev) => [
-      {
-        ...input,
-        id: Date.now(),
-        studentName: CURRENT_STUDENT,
-        status: "pending",
-        createdAt: new Date().toISOString().slice(0, 10),
-      },
-      ...prev,
-    ]);
-  }, []);
-
-  const updateBookStatus = useCallback((id: number, status: RequestStatus) => {
-    setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
-  }, []);
-
-  const value = useMemo(
-    () => ({ requests, addBookRequest, updateBookStatus }),
-    [requests, addBookRequest, updateBookStatus],
-  );
+  const value = useMemo<AppContextValue>(() => {
+    if (!state) return { ready: false, db: null, session: null, role: null, currentStudent: null, actions };
+    const { db, session } = state;
+    const currentStudent = session?.role === "student" ? (db.students.find((s) => s.id === session.studentId) ?? null) : null;
+    return { ready: true, db, session, role: session?.role ?? null, currentStudent, actions };
+  }, [state]);
 
   return <AppContext value={value}>{children}</AppContext>;
 }
@@ -74,4 +42,21 @@ export function useApp() {
   const ctx = useContext(AppContext);
   if (!ctx) throw new Error("useApp must be used within <AppProvider>");
   return ctx;
+}
+
+/**
+ * For components rendered inside <AuthGuard>, where data is loaded and a user
+ * is signed in. Narrows the types so pages don't repeat null checks.
+ */
+export function useSignedIn() {
+  const ctx = useApp();
+  if (!ctx.ready || !ctx.session) throw new Error("useSignedIn must be used inside <AuthGuard>");
+  return ctx as AppContextValue & LoadedState & { session: Session; role: Role };
+}
+
+/** For student-only pages (guarded by role). */
+export function useStudent() {
+  const ctx = useSignedIn();
+  if (!ctx.currentStudent) throw new Error("useStudent must be used on a student route");
+  return { ...ctx, student: ctx.currentStudent };
 }

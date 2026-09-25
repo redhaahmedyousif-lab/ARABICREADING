@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, FileText, SearchX, Upload } from "lucide-react";
 import type { LibraryFile } from "@/types";
+import { useSignedIn } from "@/context/AppContext";
 import {
   Button,
   Card,
@@ -29,6 +30,8 @@ function formatSize(bytes: number) {
 }
 
 export default function LibraryPage() {
+  const { role } = useSignedIn();
+  const canUpload = role === "teacher";
   const [files, setFiles] = useState<LibraryFile[]>(INITIAL_FILES);
   const [query, setQuery] = useState("");
   const [title, setTitle] = useState("");
@@ -52,7 +55,7 @@ export default function LibraryPage() {
         title: title.trim(),
         description: description.trim() || "ملف مرجعي للمجموعة",
         size: file ? formatSize(file.size) : "—",
-        uploadedBy: "أنت",
+        uploadedBy: "المعلم",
         date: new Date().toISOString().slice(0, 10),
       },
       ...prev,
@@ -72,7 +75,7 @@ export default function LibraryPage() {
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <section aria-labelledby="files-heading" className="space-y-4 lg:col-span-2">
+        <section aria-labelledby="files-heading" className={canUpload ? "space-y-4 lg:col-span-2" : "space-y-4 lg:col-span-3"}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 id="files-heading" className="text-lg font-bold text-foreground">
               الملفات المتاحة <span className="text-sm font-medium text-subtle tabular-nums">({results.length})</span>
@@ -117,20 +120,21 @@ export default function LibraryPage() {
           )}
         </section>
 
-        <aside>
-          <Card className="lg:sticky lg:top-24">
-            <CardHeader className="flex-col items-start gap-1">
-              <CardTitle>إضافة ملف PDF</CardTitle>
-              <CardDescription>أضف قائمة كتب أو مرجعاً جديداً إلى المكتبة.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form key={formKey} onSubmit={handleUpload} className="space-y-4">
-                <Field label="عنوان الملف">
-                  {(id) => <Input id={id} required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: ملخصات كتاب..." />}
-                </Field>
-                <Field label="وصف مختصر">
-                  {(id) => (
-                    <Textarea id={id} rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="نبذة عن محتوى الملف..." />
+        {canUpload && (
+          <aside>
+            <Card className="lg:sticky lg:top-24">
+              <CardHeader className="flex-col items-start gap-1">
+                <CardTitle>إضافة ملف PDF</CardTitle>
+                <CardDescription>أضف قائمة كتب أو مرجعاً جديداً إلى المكتبة.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form key={formKey} onSubmit={handleUpload} className="space-y-4">
+                  <Field label="عنوان الملف">
+                    {(id) => <Input id={id} required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: ملخصات كتاب..." />}
+                  </Field>
+                  <Field label="وصف مختصر">
+                    {(id) => (
+                      <Textarea id={id} rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="نبذة عن محتوى الملف..." />
                   )}
                 </Field>
                 <Field label="ملف PDF">
@@ -152,6 +156,7 @@ export default function LibraryPage() {
             </CardContent>
           </Card>
         </aside>
+        )}
       </div>
     </div>
   );

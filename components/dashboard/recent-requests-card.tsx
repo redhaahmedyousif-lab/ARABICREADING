@@ -2,19 +2,22 @@
 
 import Link from "next/link";
 import { Inbox } from "lucide-react";
-import { useApp } from "@/context/AppContext";
+import { useSignedIn } from "@/context/AppContext";
 import { REQUEST_STATUS } from "@/lib/constants";
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState } from "@/components/ui";
 
 export function RecentRequestsCard({ limit = 4 }: { limit?: number }) {
-  const { requests } = useApp();
-  const recent = requests.slice(0, limit);
+  const { db, role, currentStudent } = useSignedIn();
+  const names = new Map(db.students.map((s) => [s.id, s.name]));
+  // Students only see their own suggestions.
+  const mine = role === "student" ? db.requests.filter((r) => r.studentId === currentStudent?.id) : db.requests;
+  const recent = mine.slice(0, limit);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>أحدث مقترحات الكتب</CardTitle>
-        <Link href="/teacher/dashboard" className="text-xs font-semibold text-primary hover:underline">
+        <CardTitle>{role === "teacher" ? "أحدث مقترحات الكتب" : "مقترحاتي"}</CardTitle>
+        <Link href={role === "teacher" ? "/teacher/dashboard" : "/student/dashboard"} className="text-xs font-semibold text-primary hover:underline">
           عرض الكل
         </Link>
       </CardHeader>
@@ -28,7 +31,8 @@ export function RecentRequestsCard({ limit = 4 }: { limit?: number }) {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-foreground">{req.title}</p>
                   <p className="truncate text-xs text-muted">
-                    {req.author} • {req.studentName}
+                    {req.author}
+                    {role === "teacher" && ` • ${names.get(req.studentId) ?? ""}`}
                   </p>
                 </div>
                 <Badge tone={REQUEST_STATUS[req.status].tone} dot>
