@@ -9,6 +9,7 @@ import { getLeaderboard } from "@/lib/stats";
 import type { Role } from "@/types";
 import { Leaderboard } from "@/components/dashboard/leaderboard";
 import { RecentRequestsCard } from "@/components/dashboard/recent-requests-card";
+import { WeeklyChallengeBanner } from "@/components/dashboard/weekly-challenge-banner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, PageHeader, StatCard, buttonStyles } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -70,6 +71,8 @@ export default function OverviewPage() {
           </Link>
         }
       />
+
+      <WeeklyChallengeBanner />
 
       <section aria-label="إحصاءات" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="الطلاب المشاركون" value={db.students.length} icon={Users} tone="primary" />

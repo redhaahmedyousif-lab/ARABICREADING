@@ -5,6 +5,7 @@ import { KeyRound, RefreshCw, Trash2, UserPlus, Users } from "lucide-react";
 import { useSignedIn } from "@/context/AppContext";
 import { MIN_PASSWORD_LENGTH, generatePassword } from "@/lib/auth/crypto";
 import { getStudentStats } from "@/lib/stats";
+import { LevelBadge } from "@/components/dashboard/level-badge";
 import {
   Alert,
   Button,
@@ -204,7 +205,10 @@ export function StudentsPanel() {
                     return (
                       <tr key={student.id} className="border-b border-border last:border-0">
                         <td className="px-5 py-3 sm:px-6">
-                          <p className="font-semibold text-foreground">{student.name}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-semibold text-foreground">{student.name}</p>
+                              <LevelBadge pagesRead={stats.pagesRead} />
+                            </div>
                           <p dir="ltr" className="text-end font-mono text-xs text-subtle">
                             @{student.username}
                           </p>

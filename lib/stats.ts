@@ -61,7 +61,8 @@ export function getStudentStats(student: Student, requests: BookRequest[], today
     completedBooks: completed.length,
     pagesRead,
     approvedBooks,
-    reviewedBooks: completed.filter((b) => b.rating && b.note).length,
+    // Only reviews the teacher approved count toward the "critic" medal.
+    reviewedBooks: completed.filter((b) => b.review?.status === "approved" && b.review.summary).length,
     totalMinutes: student.sessions.reduce((sum, s) => sum + s.minutes, 0),
     sessionsCount: student.sessions.length,
     minutesToday: minutesByDay(student.sessions).get(today) ?? 0,

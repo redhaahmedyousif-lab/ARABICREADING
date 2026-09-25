@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { BookOpen, Plus, SearchX, Trash2 } from "lucide-react";
 import { useSignedIn } from "@/context/AppContext";
-import { Badge, Button, Card, EmptyState } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, StarRating } from "@/components/ui";
+
+interface PublicReview {
+  studentName: string;
+  rating: number;
+  summary: string;
+}
 
 export function LibraryCatalog({ query }: { query: string }) {
   const { db, role, currentStudent, actions } = useSignedIn();
@@ -14,6 +20,18 @@ export function LibraryCatalog({ query }: { query: string }) {
     ? db.library.filter((b) => [b.title, b.author, b.description].some((field) => field.toLowerCase().includes(q)))
     : db.library;
   const onMyList = new Set(currentStudent?.books.map((b) => b.catalogId).filter(Boolean));
+  const names = new Map(db.students.map((s) => [s.id, s.name]));
+
+  // Only teacher-approved reviews are public.
+  const reviewsByBook = new Map<string, PublicReview[]>();
+  for (const student of db.students) {
+    for (const book of student.books) {
+      if (!book.catalogId || book.review?.status !== "approved") continue;
+      const list = reviewsByBook.get(book.catalogId) ?? [];
+      list.push({ studentName: student.name, rating: book.review.rating, summary: book.review.summary });
+      reviewsByBook.set(book.catalogId, list);
+    }
+  }
 
   if (books.length === 0) {
     return q ? (
@@ -28,6 +46,9 @@ export function LibraryCatalog({ query }: { query: string }) {
       {books.map((book) => {
         const added = onMyList.has(book.id);
         const confirming = confirmingId === book.id;
+        const reviews = reviewsByBook.get(book.id) ?? [];
+        const average = reviews.length ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
+        const suggester = book.suggestedBy ? names.get(book.suggestedBy) : undefined;
         return (
           <li key={book.id}>
             <Card className="flex h-full flex-col gap-3 p-5 transition-colors duration-200 hover:border-primary/40">
@@ -40,9 +61,31 @@ export function LibraryCatalog({ query }: { query: string }) {
                   <p className="text-xs text-muted">
                     {book.author} • {book.pages} صفحة
                   </p>
+                  {suggester && <Badge tone="info">اقترحه {suggester}</Badge>}
                 </div>
               </div>
-              {book.description && <p className="flex-1 text-sm leading-relaxed text-muted">{book.description}</p>}
+              {book.description && <p className="text-sm leading-relaxed text-muted">{book.description}</p>}
+
+              {reviews.length > 0 && (
+                <details className="group rounded-xl bg-surface-muted px-3 py-2 text-sm">
+                  <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-semibold text-foreground">
+                    <StarRating value={Math.round(average)} readOnly size="sm" label="متوسط التقييم" />
+                    <span className="tabular-nums">{average.toFixed(1)}</span>
+                    <span className="text-muted">• آراء القرّاء ({reviews.length})</span>
+                  </summary>
+                  <ul className="mt-2 space-y-2">
+                    {reviews.map((r) => (
+                      <li key={r.studentName + r.summary} className="space-y-0.5">
+                        <p className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                          {r.studentName}
+                          <StarRating value={r.rating} readOnly size="sm" label="التقييم" />
+                        </p>
+                        <p className="text-xs leading-relaxed whitespace-pre-line text-muted">{r.summary}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
 
               <div className="mt-auto flex items-center justify-end gap-2 pt-1">
                 {role === "student" &&

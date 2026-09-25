@@ -1,30 +1,108 @@
 "use client";
 
 import { useState } from "react";
-import { PencilLine, Quote, Star } from "lucide-react";
-import type { Book, ReadingStatus, RequestStatus } from "@/types";
+import { PencilLine, Quote } from "lucide-react";
+import type { ActionResult, Book, ReadingStatus, RequestStatus } from "@/types";
 import { READING_STATUS, REQUEST_STATUS } from "@/lib/constants";
-import { cn } from "@/lib/utils";
-import { Badge, Button, Card, Input, Select } from "@/components/ui";
+import { REVIEW_MAX_CHARS, REVIEW_MAX_LINES } from "@/lib/store/actions";
+import { LIBRARY_CATEGORY } from "@/lib/store/seed";
+import { Alert, Badge, Button, Card, Select, StarRating, Textarea } from "@/components/ui";
+
+const REVIEW_STATUS = {
+  pending: { label: "بانتظار موافقة المعلم", tone: "warning" },
+  approved: { label: "معتمدة ومنشورة", tone: "success" },
+  rejected: { label: "لم تُعتمد — عدّلها وأعد الإرسال", tone: "danger" },
+} as const;
 
 interface BookCardProps {
   book: Book;
   /** Approval state when the student suggested this book. */
   requestStatus?: RequestStatus;
   onStatusChange: (status: ReadingStatus) => void;
-  onRate: (rating: number) => void;
-  onSaveNote: (note: string) => void;
+  onSubmitReview: (rating: number, summary: string) => ActionResult;
 }
 
-export function BookCard({ book, requestStatus, onStatusChange, onRate, onSaveNote }: BookCardProps) {
-  const [editingNote, setEditingNote] = useState(false);
-  const [draft, setDraft] = useState(book.note ?? "");
+function ReviewSection({ book, onSubmitReview }: Pick<BookCardProps, "book" | "onSubmitReview">) {
+  const { review } = book;
+  const [editing, setEditing] = useState(!review);
+  const [rating, setRating] = useState(review?.rating ?? 0);
+  const [summary, setSummary] = useState(review?.summary ?? "");
+  const [error, setError] = useState("");
 
-  const saveNote = () => {
-    onSaveNote(draft.trim());
-    setEditingNote(false);
+  const lines = summary.split("\n").length;
+
+  const submit = () => {
+    const result = onSubmitReview(rating, summary);
+    if (result.ok) {
+      setEditing(false);
+      setError("");
+    } else {
+      setError(result.error);
+    }
   };
 
+  if (!editing && review) {
+    const status = REVIEW_STATUS[review.status];
+    return (
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <StarRating value={review.rating} readOnly size="sm" label="تقييمي" />
+            <Badge tone={status.tone} dot>
+              {status.label}
+            </Badge>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+            <PencilLine className="size-3.5" aria-hidden />
+            تعديل المراجعة
+          </Button>
+        </div>
+        {review.summary && (
+          <blockquote className="flex gap-2 text-sm leading-relaxed whitespace-pre-line text-foreground">
+            <Quote className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+            {review.summary}
+          </blockquote>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-foreground">قيّم الكتاب واكتب خلاصتك</span>
+        <StarRating value={rating} onChange={setRating} label="التقييم" />
+      </div>
+      <Textarea
+        rows={REVIEW_MAX_LINES}
+        maxLength={REVIEW_MAX_CHARS}
+        value={summary}
+        onChange={(e) => setSummary(e.target.value)}
+        placeholder="خلاصة في 3 أسطر كحد أقصى: ما فكرة الكتاب؟ وماذا تعلّمت منه؟"
+        aria-label="خلاصة الكتاب"
+        className="min-h-0"
+      />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className={`text-[11px] tabular-nums ${lines > REVIEW_MAX_LINES ? "text-danger" : "text-subtle"}`}>
+          {lines} من {REVIEW_MAX_LINES} أسطر • {summary.length} من {REVIEW_MAX_CHARS} حرف • تُنشر بعد موافقة المعلم
+        </span>
+        <div className="flex gap-2">
+          {review && (
+            <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+              إلغاء
+            </Button>
+          )}
+          <Button size="sm" onClick={submit}>
+            إرسال للمراجعة
+          </Button>
+        </div>
+      </div>
+      {error && <Alert tone="danger">{error}</Alert>}
+    </div>
+  );
+}
+
+export function BookCard({ book, requestStatus, onStatusChange, onSubmitReview }: BookCardProps) {
   return (
     <Card className="group space-y-4 p-5 transition-colors duration-200 hover:border-primary/40">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -36,11 +114,12 @@ export function BookCard({ book, requestStatus, onStatusChange, onRate, onSaveNo
                 مقترح • {REQUEST_STATUS[requestStatus].label}
               </Badge>
             ) : (
-              <Badge tone="primary">قائمة رسمية</Badge>
+              <Badge tone="primary">من المكتبة</Badge>
             )}
           </div>
           <p className="text-xs text-muted">
-            {book.author} • {book.pages} صفحة • {book.category}
+            {book.author} • {book.pages} صفحة
+            {book.category !== LIBRARY_CATEGORY && ` • ${book.category}`}
           </p>
         </div>
 
@@ -59,64 +138,8 @@ export function BookCard({ book, requestStatus, onStatusChange, onRate, onSaveNo
       </div>
 
       {book.status === "completed" && (
-        <div className="animate-fade-in space-y-3 rounded-xl border border-border bg-surface-muted p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-1" role="radiogroup" aria-label="التقييم">
-              {[1, 2, 3, 4, 5].map((star) => {
-                const filled = (book.rating ?? 0) >= star;
-                return (
-                  <button
-                    key={star}
-                    type="button"
-                    role="radio"
-                    aria-checked={book.rating === star}
-                    aria-label={`${star} من 5`}
-                    onClick={() => onRate(star)}
-                    className="cursor-pointer rounded p-0.5 transition-transform duration-150 hover:scale-125"
-                  >
-                    <Star className={cn("size-4", filled ? "fill-warning text-warning" : "text-border-strong")} aria-hidden />
-                  </button>
-                );
-              })}
-            </div>
-
-            {book.note && !editingNote && (
-              <Button variant="ghost" size="sm" onClick={() => { setDraft(book.note ?? ""); setEditingNote(true); }}>
-                <PencilLine className="size-3.5" aria-hidden />
-                تعديل الخلاصة
-              </Button>
-            )}
-          </div>
-
-          {editingNote ? (
-            <div className="space-y-2">
-              <Input
-                autoFocus
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && saveNote()}
-                placeholder="اكتب خلاصة سريعة أو اقتباساً ملهماً من الكتاب..."
-                aria-label="الخلاصة أو الاقتباس"
-              />
-              <div className="flex justify-end gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setEditingNote(false)}>
-                  إلغاء
-                </Button>
-                <Button size="sm" onClick={saveNote}>
-                  حفظ
-                </Button>
-              </div>
-            </div>
-          ) : book.note ? (
-            <blockquote className="flex gap-2 text-sm leading-relaxed text-foreground">
-              <Quote className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-              {book.note}
-            </blockquote>
-          ) : (
-            <Button variant="soft" size="sm" onClick={() => { setDraft(""); setEditingNote(true); }}>
-              إضافة خلاصة أو اقتباس
-            </Button>
-          )}
+        <div className="animate-fade-in rounded-xl border border-border bg-surface-muted p-4">
+          <ReviewSection key={book.review?.submittedAt ?? "new"} book={book} onSubmitReview={onSubmitReview} />
         </div>
       )}
     </Card>

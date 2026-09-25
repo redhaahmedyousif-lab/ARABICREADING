@@ -19,7 +19,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "streak-3", title: "شرارة", description: "حافظ على تتابع 3 أيام", icon: Zap, target: 3, value: (s) => s.longestStreak },
   { id: "streak-7", title: "شعلة الأسبوع", description: "حافظ على تتابع 7 أيام", icon: Flame, target: 7, value: (s) => s.longestStreak },
   { id: "marathon", title: "ماراثون القراءة", description: "اقرأ 300 دقيقة بالمؤقت", icon: Hourglass, target: 300, value: (s) => s.totalMinutes },
-  { id: "critic", title: "الناقد", description: "قيّم ولخّص 3 كتب منجزة", icon: MessageSquareQuote, target: 3, value: (s) => s.reviewedBooks },
+  { id: "critic", title: "الناقد", description: "اعتمد المعلم 3 من مراجعاتك", icon: MessageSquareQuote, target: 3, value: (s) => s.reviewedBooks },
   { id: "curator", title: "المُرشِّح", description: "يعتمد المعلم كتاباً اقترحته", icon: Award, target: 1, value: (s) => s.approvedBooks },
 ];
 

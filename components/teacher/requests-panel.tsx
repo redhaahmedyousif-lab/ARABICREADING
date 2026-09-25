@@ -5,7 +5,7 @@ import { Check, Inbox, X } from "lucide-react";
 import { useSignedIn } from "@/context/AppContext";
 import { REQUEST_STATUS } from "@/lib/constants";
 import type { RequestStatus } from "@/types";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, SegmentedTabs, type TabOption } from "@/components/ui";
+import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, EmptyState, SegmentedTabs, type TabOption } from "@/components/ui";
 
 type Filter = "all" | RequestStatus;
 
@@ -28,7 +28,10 @@ export function RequestsPanel() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>مقترحات الطلاب</CardTitle>
+        <div className="space-y-1">
+          <CardTitle>اقتراحات الكتب</CardTitle>
+          <CardDescription className="text-xs">الكتاب المعتمد يُضاف إلى المكتبة ويظهر لجميع الطلاب.</CardDescription>
+        </div>
         <SegmentedTabs label="تصفية الطلبات" options={tabs} value={filter} onChange={setFilter} />
       </CardHeader>
       <CardContent>
@@ -46,13 +49,14 @@ export function RequestsPanel() {
                   <p className="text-xs text-muted">
                     {req.author} • {req.pages} صفحة • {req.category} • {req.createdAt}
                   </p>
+                  {req.description && <p className="text-sm text-muted">{req.description}</p>}
                 </div>
 
                 {req.status === "pending" ? (
                   <div className="flex gap-2">
                     <Button variant="success" size="sm" onClick={() => actions.updateRequestStatus(req.id, "approved")}>
                       <Check className="size-3.5" aria-hidden />
-                      اعتماد
+                      اعتماد وإضافة للمكتبة
                     </Button>
                     <Button variant="danger" size="sm" onClick={() => actions.updateRequestStatus(req.id, "rejected")}>
                       <X className="size-3.5" aria-hidden />

@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { Send } from "lucide-react";
 import type { BookRequestInput } from "@/types";
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Field, Input } from "@/components/ui";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Field, Input, Textarea } from "@/components/ui";
 
-const EMPTY = { title: "", author: "", pages: "", category: "" };
+const EMPTY = { title: "", author: "", pages: "", category: "", description: "" };
 
 export function SuggestBookForm({ onSubmit }: { onSubmit: (input: BookRequestInput) => void }) {
   const [values, setValues] = useState(EMPTY);
 
-  const set = (key: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const set = (key: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setValues((v) => ({ ...v, [key]: e.target.value }));
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -24,6 +24,7 @@ export function SuggestBookForm({ onSubmit }: { onSubmit: (input: BookRequestInp
       author,
       pages: Number(values.pages) || 100,
       category: values.category.trim() || "عام",
+      description: values.description.trim(),
     });
     setValues(EMPTY);
   };
@@ -32,7 +33,7 @@ export function SuggestBookForm({ onSubmit }: { onSubmit: (input: BookRequestInp
     <Card className="lg:sticky lg:top-24">
       <CardHeader className="flex-col items-start gap-1">
         <CardTitle>اقتراح كتاب جديد</CardTitle>
-        <CardDescription>يُرسل الاقتراح فوراً إلى لوحة المعلم للاعتماد.</CardDescription>
+        <CardDescription>يبقى الكتاب بانتظار موافقة المعلم، ويُضاف إلى المكتبة للجميع بعد اعتماده.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -52,6 +53,11 @@ export function SuggestBookForm({ onSubmit }: { onSubmit: (input: BookRequestInp
               {(id) => <Input id={id} value={values.category} onChange={set("category")} placeholder="رواية / تاريخ" />}
             </Field>
           </div>
+          <Field label="نبذة عن الكتاب (اختياري)">
+            {(id) => (
+              <Textarea id={id} rows={2} value={values.description} onChange={set("description")} placeholder="لماذا تقترح هذا الكتاب؟" />
+            )}
+          </Field>
           <Button type="submit" size="lg" className="w-full">
             <Send className="size-4 rtl:-scale-x-100" aria-hidden />
             إرسال الطلب للمعلم

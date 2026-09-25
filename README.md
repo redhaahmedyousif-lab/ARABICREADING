@@ -78,8 +78,31 @@ runs in the browser can be bypassed, so **before real use** move `lib/store/acti
 to server actions backed by a database, and replace the localStorage session with an httpOnly
 cookie checked in `proxy.ts`. The action signatures are designed to carry over unchanged.
 
+## Approval flow
+
+- **Book suggestions:** a student's suggestion stays on their own list as «بانتظار الاعتماد» and is
+  invisible to other students. When the teacher approves it, it is added to the shared library
+  (linked back to the student). Rejected suggestions never reach the library.
+- **Teacher direct add:** books the teacher adds on the library page / «إدارة الكتب» are published immediately.
+- **Reviews:** students rate completed books (1–5 stars) with a summary of at most 3 lines / 300 characters.
+  Reviews are pending until the teacher approves them; only approved reviews appear in the library.
+
+## Teacher tools
+
+«الموافقات» (suggestions + reviews), «إدارة الطلاب» (add / delete / reset password), «إدارة الكتب»
+(add / delete library books), «التحدي الأسبوعي» (7-day target in pages, minutes or books, shown as a
+banner with each student's progress) and «لوحة الصدارة والشهادات» (certificate of appreciation per
+student, downloadable as PNG or printable / saved as PDF).
+
+## Stored data and upgrades
+
+`lib/store/migrate.ts` upgrades saved browser data when the schema changes, so accounts the teacher
+created are kept across releases. Add a migration step there with every schema change.
+
 ## Gamification
 
 - **Points** = pages of completed books + 100 per approved suggestion + 20 per current streak day (`lib/stats.ts`).
 - **Streak** counts consecutive days with at least one saved timer session. It stays alive until a full day is missed.
 - **Medals** are computed from stats, never stored, so they can't drift out of sync.
+- **Reading levels** (`lib/levels.ts`) by pages of completed books: قارئ مبتدئ (0) → قارئ نشيط (300) →
+  قارئ متميز (800) → قارئ خبير (1500) → سفير القراءة (3000).

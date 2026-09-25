@@ -1,4 +1,5 @@
 import type { Database, Session } from "@/types";
+import { migrate } from "./migrate";
 import { createSeedDb } from "./seed";
 
 /**
@@ -13,11 +14,11 @@ export interface StoreState {
   session: Session | null;
 }
 
-// Bump the version (here and in `Database["version"]`) whenever the seed or the
-// schema changes; browsers holding older data are then re-seeded.
-const DB_VERSION = 2;
-const DB_KEY = `reading-challenge:db:v${DB_VERSION}`;
-const SESSION_KEY = `reading-challenge:session:v${DB_VERSION}`;
+// Schema changes are handled by `migrate()` (see migrate.ts) so saved accounts
+// survive upgrades. Data under the legacy versioned keys is moved here once.
+const DB_KEY = "reading-challenge:db";
+const SESSION_KEY = "reading-challenge:session";
+const LEGACY_KEYS = { db: "reading-challenge:db:v2", session: "reading-challenge:session:v2" };
 
 let state: StoreState | null = null;
 let loading: Promise<void> | null = null;
@@ -56,19 +57,29 @@ function readState(db: Database): StoreState {
   return { db, session: validSession(read<Session>(SESSION_KEY), db) };
 }
 
+function moveLegacyData() {
+  if (read(DB_KEY) !== null) return;
+  const legacyDb = read(LEGACY_KEYS.db);
+  if (legacyDb === null) return;
+  write(DB_KEY, legacyDb);
+  write(SESSION_KEY, read(LEGACY_KEYS.session));
+  write(LEGACY_KEYS.db, null);
+  write(LEGACY_KEYS.session, null);
+}
+
 async function load() {
-  let db = read<Database>(DB_KEY);
-  if (db?.version !== DB_VERSION) {
-    db = await createSeedDb();
-    write(DB_KEY, db);
-  }
+  moveLegacyData();
+  const stored = read<unknown>(DB_KEY);
+  let db = migrate(stored);
+  if (!db) db = await createSeedDb();
+  if (db !== stored) write(DB_KEY, db);
   state = readState(db);
   emit();
 }
 
 function onStorage(e: StorageEvent) {
   if (e.key !== DB_KEY && e.key !== SESSION_KEY) return;
-  const db = read<Database>(DB_KEY);
+  const db = migrate(read<unknown>(DB_KEY));
   if (db) {
     state = readState(db);
     emit();

@@ -56,10 +56,11 @@ export async function createSeedDb(): Promise<Database> {
   }));
 
   return {
-    version: 2,
+    version: 3,
     teacher: { name: TEACHER_NAME, ...teacherCreds },
     students,
     requests: [],
     library,
+    challenge: null,
   };
 }

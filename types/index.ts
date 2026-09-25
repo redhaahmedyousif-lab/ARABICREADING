@@ -16,8 +16,20 @@ export interface Book {
   catalogId?: string;
   /** Set when the student suggested this book to the teacher. */
   requestId?: string;
-  note?: string;
-  rating?: number;
+  /** Local day the book was marked completed (drives weekly challenges). */
+  completedAt?: string;
+  review?: BookReview;
+}
+
+/** Review / approval lifecycle shared by suggestions and reviews. */
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
+/** A student's rating + short summary of a completed book; shown to others once approved. */
+export interface BookReview {
+  rating: number;
+  summary: string;
+  status: ApprovalStatus;
+  submittedAt: string;
 }
 
 export interface BookRequestInput {
@@ -25,6 +37,7 @@ export interface BookRequestInput {
   author: string;
   pages: number;
   category: string;
+  description?: string;
 }
 
 export interface BookRequest extends BookRequestInput {
@@ -49,9 +62,24 @@ export interface LibraryBook {
   pages: number;
   description: string;
   createdAt: string;
+  /** Student whose approved suggestion added this book. */
+  suggestedBy?: string;
 }
 
-export type LibraryBookInput = Omit<LibraryBook, "id" | "createdAt">;
+export type LibraryBookInput = Omit<LibraryBook, "id" | "createdAt" | "suggestedBy">;
+
+export type ChallengeUnit = "pages" | "minutes" | "books";
+
+/** Teacher-set weekly target shown as a banner to every student. */
+export interface WeeklyChallenge {
+  title: string;
+  theme: string;
+  unit: ChallengeUnit;
+  target: number;
+  /** Inclusive local-day range (YYYY-MM-DD). */
+  startDate: string;
+  endDate: string;
+}
 
 export interface Credentials {
   passwordHash: string;
@@ -72,11 +100,12 @@ export interface Teacher extends Credentials {
 }
 
 export interface Database {
-  version: 2;
+  version: 3;
   teacher: Teacher;
   students: Student[];
   requests: BookRequest[];
   library: LibraryBook[];
+  challenge: WeeklyChallenge | null;
 }
 
 export type Session = { role: "teacher" } | { role: "student"; studentId: string };

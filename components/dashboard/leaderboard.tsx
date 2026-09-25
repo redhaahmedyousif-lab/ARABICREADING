@@ -1,15 +1,32 @@
 "use client";
 
-import { Crown, Trophy } from "lucide-react";
+import { useState } from "react";
+import { Crown, ScrollText, Trophy } from "lucide-react";
+import { CertificateDialog } from "@/components/teacher/certificate-dialog";
+import type { CertificateData } from "@/lib/certificate";
+import { dayKey } from "@/lib/dates";
+import { getLevel } from "@/lib/levels";
+import { LevelBadge } from "./level-badge";
 import { useApp } from "@/context/AppContext";
 import { POINTS, getLeaderboard } from "@/lib/stats";
 import { cn } from "@/lib/utils";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui";
 
 const MEDAL = ["text-amber-400", "text-slate-400", "text-orange-600"];
 
-export function Leaderboard({ limit = 10, className }: { limit?: number; className?: string }) {
+/** Top readers get a highlighted certificate button in the teacher's view. */
+const CERTIFICATE_TOP = 3;
+
+interface LeaderboardProps {
+  limit?: number;
+  className?: string;
+  /** Teacher view: adds a certificate (شهادة تقدير) action per student. */
+  withCertificates?: boolean;
+}
+
+export function Leaderboard({ limit = 10, className, withCertificates = false }: LeaderboardProps) {
   const { ready, db, currentStudent } = useApp();
+  const [certificate, setCertificate] = useState<CertificateData | null>(null);
   if (!ready) return null;
 
   const entries = getLeaderboard(db);
@@ -46,6 +63,11 @@ export function Leaderboard({ limit = 10, className }: { limit?: number; classNa
                 <th scope="col" className="hidden px-3 pb-3 text-center font-medium md:table-cell">كتب معتمدة</th>
                 <th scope="col" className="hidden px-3 pb-3 text-center font-medium sm:table-cell">التتابع</th>
                 <th scope="col" className="px-5 pb-3 text-end font-medium sm:px-6">النقاط</th>
+                {withCertificates && (
+                  <th scope="col" className="pe-5 pb-3 sm:pe-6">
+                    <span className="sr-only">شهادة تقدير</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -72,16 +94,44 @@ export function Leaderboard({ limit = 10, className }: { limit?: number; classNa
                         <span className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-muted text-xs font-bold text-foreground">
                           {student.name.charAt(0)}
                         </span>
-                        <span className="font-semibold text-foreground">
-                          {student.name}
-                          {isMe && <span className="ms-1.5 text-xs font-medium text-primary">(أنت)</span>}
-                        </span>
+                        <div className="space-y-0.5">
+                          <span className="block font-semibold text-foreground">
+                            {student.name}
+                            {isMe && <span className="ms-1.5 text-xs font-medium text-primary">(أنت)</span>}
+                          </span>
+                          <LevelBadge pagesRead={stats.pagesRead} />
+                        </div>
                       </div>
                     </td>
                     <td className="hidden px-3 py-3 text-center text-muted tabular-nums sm:table-cell">{stats.pagesRead}</td>
                     <td className="hidden px-3 py-3 text-center text-muted tabular-nums md:table-cell">{stats.approvedBooks}</td>
                     <td className="hidden px-3 py-3 text-center text-muted tabular-nums sm:table-cell">🔥 {stats.currentStreak}</td>
                     <td className="px-5 py-3 text-end font-extrabold text-foreground tabular-nums sm:px-6">{stats.points}</td>
+                    {withCertificates && (
+                      <td className="pe-5 py-3 text-end sm:pe-6">
+                        <Button
+                          size="sm"
+                          variant={rank <= CERTIFICATE_TOP ? "soft" : "ghost"}
+                          disabled={stats.completedBooks === 0}
+                          title={stats.completedBooks === 0 ? "يُتاح بعد إنجاز كتاب واحد على الأقل" : undefined}
+                          onClick={() =>
+                            setCertificate({
+                              fileSlug: db.students.find((s) => s.id === student.id)?.username ?? "student",
+                              studentName: student.name,
+                              levelTitle: getLevel(stats.pagesRead).level.title,
+                              pagesRead: stats.pagesRead,
+                              completedBooks: stats.completedBooks,
+                              rank,
+                              teacherName: db.teacher.name,
+                              date: dayKey(),
+                            })
+                          }
+                        >
+                          <ScrollText className="size-3.5" aria-hidden />
+                          شهادة
+                        </Button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -89,6 +139,7 @@ export function Leaderboard({ limit = 10, className }: { limit?: number; classNa
           </table>
         </div>
       </CardContent>
+      {withCertificates && <CertificateDialog data={certificate} onClose={() => setCertificate(null)} />}
     </Card>
   );
 }

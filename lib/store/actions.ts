@@ -8,9 +8,10 @@ import type {
   RequestStatus,
   Session,
   Student,
+  WeeklyChallenge,
 } from "@/types";
 import { MIN_PASSWORD_LENGTH, USERNAME_PATTERN, createCredentials, generatePassword, uid, verifyPassword } from "@/lib/auth/crypto";
-import { dayKey } from "@/lib/dates";
+import { addDays, dayKey } from "@/lib/dates";
 import { getState, setState } from "./db";
 import { LIBRARY_CATEGORY } from "./seed";
 
@@ -144,9 +145,88 @@ export function deleteStudent(studentId: string): ActionResult {
   return ok(undefined);
 }
 
+const sameBook = (a: { title: string; author: string }, b: { title: string; author: string }) =>
+  a.title.trim() === b.title.trim() && a.author.trim() === b.author.trim();
+
+/**
+ * Approving a suggestion publishes it to the shared library (so every student
+ * can see it) and links the suggesting student's copy to that entry.
+ * Pending or rejected suggestions stay private to the student who made them.
+ */
 export function updateRequestStatus(requestId: string, status: RequestStatus) {
   if (!isTeacher()) return;
-  updateDb((db) => ({ ...db, requests: db.requests.map((r) => (r.id === requestId ? { ...r, status } : r)) }));
+  updateDb((db) => {
+    const request = db.requests.find((r) => r.id === requestId);
+    if (!request) return db;
+    const requests = db.requests.map((r) => (r.id === requestId ? { ...r, status } : r));
+    if (status !== "approved") return { ...db, requests };
+
+    // Reuse an existing entry for the same book instead of duplicating it.
+    let entry = db.library.find((b) => sameBook(b, request));
+    const library = [...db.library];
+    if (!entry) {
+      entry = {
+        id: uid(),
+        title: request.title,
+        author: request.author,
+        pages: request.pages,
+        description: request.description ?? "",
+        createdAt: dayKey(),
+        suggestedBy: request.studentId,
+      };
+      library.unshift(entry);
+    }
+    const catalogId = entry.id;
+    const students = db.students.map((s) =>
+      s.id === request.studentId
+        ? { ...s, books: s.books.map((b) => (b.requestId === requestId ? { ...b, catalogId } : b)) }
+        : s,
+    );
+    return { ...db, requests, library, students };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Teacher: reviews & weekly challenge
+// ---------------------------------------------------------------------------
+
+export function decideReview(studentId: string, bookId: string, status: "approved" | "rejected") {
+  if (!isTeacher()) return;
+  updateDb((db) => ({
+    ...db,
+    students: db.students.map((s) =>
+      s.id !== studentId
+        ? s
+        : { ...s, books: s.books.map((b) => (b.id === bookId && b.review ? { ...b, review: { ...b.review, status } } : b)) },
+    ),
+  }));
+}
+
+export const CHALLENGE_DAYS = 7;
+
+export function setWeeklyChallenge(input: Omit<WeeklyChallenge, "endDate">): ActionResult<WeeklyChallenge> {
+  if (!getState()) return NOT_READY;
+  if (!isTeacher()) return FORBIDDEN;
+  const title = input.title.trim();
+  const target = Math.round(input.target);
+  if (!title) return fail("عنوان التحدي مطلوب.");
+  if (!Number.isFinite(target) || target < 1) return fail("الهدف يجب أن يكون رقماً أكبر من صفر.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.startDate)) return fail("تاريخ البداية غير صالح.");
+
+  const challenge: WeeklyChallenge = {
+    ...input,
+    title,
+    target,
+    theme: input.theme.trim(),
+    endDate: addDays(input.startDate, CHALLENGE_DAYS - 1),
+  };
+  updateDb((db) => ({ ...db, challenge }));
+  return ok(challenge);
+}
+
+export function clearWeeklyChallenge() {
+  if (!isTeacher()) return;
+  updateDb((db) => ({ ...db, challenge: null }));
 }
 
 // ---------------------------------------------------------------------------
@@ -220,10 +300,42 @@ export function addBookFromLibrary(libraryBookId: string): ActionResult {
   return ok(undefined);
 }
 
-export function updateBook(bookId: string, patch: Partial<Pick<Book, "status" | "rating" | "note">>) {
+export function updateBookStatus(bookId: string, status: Book["status"]) {
   const studentId = currentStudentId();
   if (!studentId) return;
-  updateStudent(studentId, (s) => ({ ...s, books: s.books.map((b) => (b.id === bookId ? { ...b, ...patch } : b)) }));
+  updateStudent(studentId, (s) => ({
+    ...s,
+    books: s.books.map((b) => {
+      if (b.id !== bookId || b.status === status) return b;
+      // Stamp the completion day (weekly challenges count it); clear it if un-completed.
+      if (status === "completed") return { ...b, status, completedAt: dayKey() };
+      const next: Book = { ...b, status };
+      delete next.completedAt;
+      return next;
+    }),
+  }));
+}
+
+export const REVIEW_MAX_LINES = 3;
+export const REVIEW_MAX_CHARS = 300;
+
+/** Saves the rating + summary as a new submission awaiting the teacher's approval. */
+export function submitReview(bookId: string, rating: number, summary: string): ActionResult {
+  const state = getState();
+  const studentId = currentStudentId();
+  if (!state || !studentId) return FORBIDDEN;
+  const book = state.db.students.find((s) => s.id === studentId)?.books.find((b) => b.id === bookId);
+  if (!book || book.status !== "completed") return fail("يمكن تقييم الكتب المنجزة فقط.");
+
+  const text = summary.trim();
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return fail("اختر تقييماً من نجمة إلى 5 نجوم.");
+  if (!text) return fail("اكتب خلاصة قصيرة للكتاب.");
+  if (text.split("\n").length > REVIEW_MAX_LINES) return fail(`الخلاصة يجب ألا تتجاوز ${REVIEW_MAX_LINES} أسطر.`);
+  if (text.length > REVIEW_MAX_CHARS) return fail(`الخلاصة يجب ألا تتجاوز ${REVIEW_MAX_CHARS} حرف.`);
+
+  const review = { rating, summary: text, status: "pending" as const, submittedAt: dayKey() };
+  updateStudent(studentId, (s) => ({ ...s, books: s.books.map((b) => (b.id === bookId ? { ...b, review } : b)) }));
+  return ok(undefined);
 }
 
 export function logReadingSession(minutes: number) {

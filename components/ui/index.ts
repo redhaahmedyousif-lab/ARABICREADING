@@ -10,3 +10,5 @@ export * from "./tabs";
 export * from "./password-input";
 export * from "./alert";
 export * from "./copy-button";
+export * from "./star-rating";
+export * from "./dialog";

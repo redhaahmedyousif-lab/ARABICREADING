@@ -6,6 +6,9 @@ import { useStudent } from "@/context/AppContext";
 import { getLeaderboard, getStudentStats } from "@/lib/stats";
 import type { BookRequestInput, ReadingStatus } from "@/types";
 import { Leaderboard } from "@/components/dashboard/leaderboard";
+import { LevelBadge } from "@/components/dashboard/level-badge";
+import { WeeklyChallengeBanner } from "@/components/dashboard/weekly-challenge-banner";
+import { LevelCard } from "@/components/student/level-card";
 import { AchievementsCard } from "@/components/student/achievements-card";
 import { BookCard } from "@/components/student/book-card";
 import { ReadingTimer } from "@/components/student/reading-timer";
@@ -44,7 +47,7 @@ export default function StudentDashboard() {
 
   const handleSuggest = (input: BookRequestInput) => {
     actions.addBookRequest(input);
-    setToast("تم إرسال المقترح بنجاح إلى لوحة المعلم للاعتماد!");
+    setToast("أُرسل المقترح إلى المعلم. سيظهر في المكتبة للجميع بعد موافقته.");
   };
 
   return (
@@ -56,7 +59,8 @@ export default function StudentDashboard() {
         actions={
           <Card className="flex items-center gap-4 px-4 py-3">
             <ProgressRing value={progress} size={56} label="نسبة إنجاز الكتب" />
-            <div>
+            <div className="space-y-1">
+              <LevelBadge pagesRead={stats.pagesRead} />
               <p className="text-xs text-muted">الكتب المنجزة</p>
               <p className="text-sm font-bold text-foreground">
                 {stats.completedBooks} من {books.length} كتب
@@ -65,6 +69,8 @@ export default function StudentDashboard() {
           </Card>
         }
       />
+
+      <WeeklyChallengeBanner />
 
       <section aria-label="إحصاءات" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="أيام التتابع" value={stats.currentStreak} icon={Flame} tone="warning" hint={`الأطول: ${stats.longestStreak}`} />
@@ -80,7 +86,12 @@ export default function StudentDashboard() {
         <StreakCard sessions={student.sessions} currentStreak={stats.currentStreak} longestStreak={stats.longestStreak} />
       </div>
 
-      <AchievementsCard stats={stats} />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <LevelCard pagesRead={stats.pagesRead} />
+        <div className="lg:col-span-2">
+          <AchievementsCard stats={stats} />
+        </div>
+      </div>
 
       {toast && <Alert tone="success">{toast}</Alert>}
 
@@ -102,9 +113,8 @@ export default function StudentDashboard() {
                   key={book.id}
                   book={book}
                   requestStatus={book.requestId ? requestStatus.get(book.requestId) : undefined}
-                  onStatusChange={(status) => actions.updateBook(book.id, { status })}
-                  onRate={(rating) => actions.updateBook(book.id, { rating })}
-                  onSaveNote={(note) => actions.updateBook(book.id, { note: note || undefined })}
+                  onStatusChange={(status) => actions.updateBookStatus(book.id, status)}
+                  onSubmitReview={(rating, summary) => actions.submitReview(book.id, rating, summary)}
                 />
               ))}
             </div>
