@@ -1,7 +1,18 @@
-import type { ActionResult, Book, BookRequestInput, Database, RequestStatus, Session, Student } from "@/types";
+import type {
+  ActionResult,
+  Book,
+  BookRequestInput,
+  Database,
+  LibraryBook,
+  LibraryBookInput,
+  RequestStatus,
+  Session,
+  Student,
+} from "@/types";
 import { MIN_PASSWORD_LENGTH, USERNAME_PATTERN, createCredentials, generatePassword, uid, verifyPassword } from "@/lib/auth/crypto";
 import { dayKey } from "@/lib/dates";
 import { getState, setState } from "./db";
+import { LIBRARY_CATEGORY } from "./seed";
 
 // All mutations live here. Each one re-checks the caller's role, so UI guards
 // are a convenience rather than the only line of defence. When a backend
@@ -73,7 +84,7 @@ export async function changePassword(current: string, next: string): Promise<Act
   if (!credentials || !(await verifyPassword(current, credentials))) return fail("كلمة المرور الحالية غير صحيحة.");
 
   const fresh = await createCredentials(next);
-  if (session.role === "teacher") updateDb((d) => ({ ...d, teacher: fresh }));
+  if (session.role === "teacher") updateDb((d) => ({ ...d, teacher: { ...d.teacher, ...fresh } }));
   else updateStudent(session.studentId, (s) => ({ ...s, ...fresh }));
   return ok(undefined);
 }
@@ -122,9 +133,50 @@ export async function createStudent(input: {
   return ok({ username, password: input.password });
 }
 
+/** Removes the account and the student's book suggestions. */
+export function deleteStudent(studentId: string): ActionResult {
+  if (!isTeacher()) return FORBIDDEN;
+  updateDb((db) => ({
+    ...db,
+    students: db.students.filter((s) => s.id !== studentId),
+    requests: db.requests.filter((r) => r.studentId !== studentId),
+  }));
+  return ok(undefined);
+}
+
 export function updateRequestStatus(requestId: string, status: RequestStatus) {
   if (!isTeacher()) return;
   updateDb((db) => ({ ...db, requests: db.requests.map((r) => (r.id === requestId ? { ...r, status } : r)) }));
+}
+
+// ---------------------------------------------------------------------------
+// Teacher: library catalog
+// ---------------------------------------------------------------------------
+
+export const MAX_BOOK_PAGES = 5000;
+
+export function addLibraryBook(input: LibraryBookInput): ActionResult<LibraryBook> {
+  if (!getState()) return NOT_READY;
+  if (!isTeacher()) return FORBIDDEN;
+
+  const title = input.title.trim();
+  const author = input.author.trim();
+  const pages = Math.round(input.pages);
+  if (!title) return fail("عنوان الكتاب مطلوب.");
+  if (!author) return fail("اسم المؤلف مطلوب.");
+  if (!Number.isFinite(pages) || pages < 1 || pages > MAX_BOOK_PAGES) {
+    return fail(`عدد الصفحات يجب أن يكون بين 1 و${MAX_BOOK_PAGES}.`);
+  }
+
+  const book: LibraryBook = { id: uid(), title, author, pages, description: input.description.trim(), createdAt: dayKey() };
+  updateDb((db) => ({ ...db, library: [book, ...db.library] }));
+  return ok(book);
+}
+
+/** Removes a book from the catalog. Copies already on students' lists are kept. */
+export function deleteLibraryBook(bookId: string) {
+  if (!isTeacher()) return;
+  updateDb((db) => ({ ...db, library: db.library.filter((b) => b.id !== bookId) }));
 }
 
 // ---------------------------------------------------------------------------
@@ -142,6 +194,30 @@ export function addBookRequest(input: BookRequestInput) {
     requests: [{ ...input, id: requestId, studentId, status: "pending", createdAt: dayKey() }, ...db.requests],
     students: db.students.map((s) => (s.id === studentId ? { ...s, books: [book, ...s.books] } : s)),
   }));
+}
+
+export function addBookFromLibrary(libraryBookId: string): ActionResult {
+  const state = getState();
+  const studentId = currentStudentId();
+  if (!state || !studentId) return FORBIDDEN;
+  const entry = state.db.library.find((b) => b.id === libraryBookId);
+  if (!entry) return fail("لم يعد هذا الكتاب متاحاً في المكتبة.");
+  const student = state.db.students.find((s) => s.id === studentId);
+  if (student?.books.some((b) => b.catalogId === libraryBookId)) return fail("الكتاب موجود في قائمتك مسبقاً.");
+
+  const { title, author, pages } = entry;
+  const book: Book = {
+    id: uid(),
+    catalogId: libraryBookId,
+    title,
+    author,
+    pages,
+    category: LIBRARY_CATEGORY,
+    status: "want_to_read",
+    addedBy: "system",
+  };
+  updateStudent(studentId, (s) => ({ ...s, books: [book, ...s.books] }));
+  return ok(undefined);
 }
 
 export function updateBook(bookId: string, patch: Partial<Pick<Book, "status" | "rating" | "note">>) {

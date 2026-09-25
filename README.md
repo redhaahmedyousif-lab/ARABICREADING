@@ -11,14 +11,16 @@ npm run lint
 npm run build
 ```
 
-## Demo accounts
+## Default accounts
 
-| Role | Username | Password |
-| --- | --- | --- |
-| Teacher (master password) | — | `teacher123` |
-| Student | `sara` / `youssef` / `mariam` / `omar` | `<username>123` (e.g. `sara123`) |
+| Role | Name | Username | Password |
+| --- | --- | --- | --- |
+| Teacher (master password) | أستاذ حسن بو سهيل | — | `teacher123` |
+| Student | رضا الجبوري | `redha` | `redha123` |
 
-Data lives in the browser's localStorage. To start over, clear site data for the app.
+The teacher adds or deletes student accounts under **لوحة المعلم → إدارة الطلاب**, and adds books
+to the library under **إدارة الكتب** (or on the library page). Data lives in the browser's
+localStorage; to start over, clear site data for the app.
 
 ## Project structure
 
@@ -34,18 +36,18 @@ app/
     page.tsx                 /                    Overview
     student/dashboard/       /student/dashboard   Student reading tracker
     teacher/dashboard/       /teacher/dashboard   Requests, student accounts, leaderboard
-    library/                 /library             PDF library (upload: teacher only)
+    library/                 /library             Book catalog + PDF lists (teacher adds/removes books)
     profile/                 /profile             Account info + change password
 components/
   ui/                        Design-system primitives (Button, Card, Badge, Field, StatCard, …)
   layout/                    App shell: DashboardShell, Sidebar, Topbar, ThemeToggle, Logo
   auth/                      AuthGuard, LoginForm, ChangePasswordForm
-  dashboard/ student/ teacher/  Feature components (timer, streak, medals, leaderboard, account admin…)
+  dashboard/ student/ teacher/ library/  Feature components (timer, streak, medals, leaderboard, account & book admin…)
 context/AppContext.tsx       React binding for the store: useApp / useSignedIn / useStudent
 lib/
   store/db.ts                localStorage-backed external store (SSR-safe, syncs across tabs)
   store/actions.ts           Every mutation, with role checks — becomes server actions later
-  store/seed.ts              Demo accounts and reading history
+  store/seed.ts              Default accounts, teacher name, starter library catalog
   auth/crypto.ts             Salted SHA-256 hashing, password/ID generation
   stats.ts                   Streaks, points, leaderboard (pure functions)
   achievements.ts            Medal definitions, derived from stats

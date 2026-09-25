@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { BookOpen, Flame, Medal, Timer, Trophy } from "lucide-react";
 import { LoginForm } from "@/components/auth/login-form";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { TEACHER_NAME } from "@/lib/store/seed";
 
 export const metadata: Metadata = { title: "تسجيل الدخول" };
 
@@ -57,7 +58,7 @@ export default function LoginPage() {
           </ul>
         </div>
 
-        <p className="relative text-xs text-indigo-200">© 2026 منصة تحدي القراءة</p>
+        <p className="relative text-xs text-indigo-200">بإشراف {TEACHER_NAME} • © 2026 منصة تحدي القراءة</p>
       </aside>
     </div>
   );

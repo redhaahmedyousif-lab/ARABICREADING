@@ -12,6 +12,8 @@ export interface Book {
   category: string;
   status: ReadingStatus;
   addedBy: "system" | "student";
+  /** Set when the book was added from the library catalog. */
+  catalogId?: string;
   /** Set when the student suggested this book to the teacher. */
   requestId?: string;
   note?: string;
@@ -39,6 +41,18 @@ export interface ReadingSession {
   minutes: number;
 }
 
+/** A book in the shared library catalog, managed by the teacher. */
+export interface LibraryBook {
+  id: string;
+  title: string;
+  author: string;
+  pages: number;
+  description: string;
+  createdAt: string;
+}
+
+export type LibraryBookInput = Omit<LibraryBook, "id" | "createdAt">;
+
 export interface Credentials {
   passwordHash: string;
   salt: string;
@@ -53,11 +67,16 @@ export interface Student extends Credentials {
   sessions: ReadingSession[];
 }
 
+export interface Teacher extends Credentials {
+  name: string;
+}
+
 export interface Database {
-  version: 1;
-  teacher: Credentials;
+  version: 2;
+  teacher: Teacher;
   students: Student[];
   requests: BookRequest[];
+  library: LibraryBook[];
 }
 
 export type Session = { role: "teacher" } | { role: "student"; studentId: string };

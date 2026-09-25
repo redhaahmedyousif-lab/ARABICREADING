@@ -6,7 +6,7 @@ import { GraduationCap, KeyRound, LogIn, UserRound } from "lucide-react";
 import type { Role } from "@/types";
 import { useApp } from "@/context/AppContext";
 import { safeRedirect } from "@/lib/navigation";
-import { DEFAULT_STUDENTS, DEFAULT_TEACHER_PASSWORD } from "@/lib/store/seed";
+import { DEFAULT_STUDENTS, DEFAULT_TEACHER_PASSWORD, TEACHER_NAME } from "@/lib/store/seed";
 import { cn } from "@/lib/utils";
 import { Alert, Button, Field, Input, PasswordInput } from "@/components/ui";
 
@@ -128,7 +128,7 @@ export function LoginForm() {
         </summary>
         <div className="mt-3 space-y-2 text-xs text-muted">
           {role === "teacher" ? (
-            <DemoRow label="المعلم" pass={DEFAULT_TEACHER_PASSWORD} onUse={() => fillDemo("", DEFAULT_TEACHER_PASSWORD)} />
+            <DemoRow label={TEACHER_NAME} pass={DEFAULT_TEACHER_PASSWORD} onUse={() => fillDemo("", DEFAULT_TEACHER_PASSWORD)} />
           ) : (
             DEFAULT_STUDENTS.map((s) => (
               <DemoRow key={s.username} label={s.name} user={s.username} pass={s.password} onUse={() => fillDemo(s.username, s.password)} />

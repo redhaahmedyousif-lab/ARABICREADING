@@ -6,7 +6,7 @@ import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, PageHeader } from "@/components/ui";
 
 export default function ProfilePage() {
-  const { role, currentStudent } = useSignedIn();
+  const { db, role, currentStudent } = useSignedIn();
 
   const details =
     role === "student" && currentStudent
@@ -15,7 +15,10 @@ export default function ProfilePage() {
           { label: "اسم المستخدم", value: currentStudent.username, ltr: true },
           { label: "تاريخ إنشاء الحساب", value: currentStudent.createdAt, ltr: true },
         ]
-      : [{ label: "نوع الحساب", value: "معلم مشرف — صلاحيات كاملة" }];
+      : [
+          { label: "الاسم", value: db.teacher.name },
+          { label: "نوع الحساب", value: "معلم مشرف — صلاحيات كاملة" },
+        ];
 
   return (
     <div className="space-y-8">

@@ -39,3 +39,21 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# logs & tool output
+*.log
+/test-results/
+/playwright-report/
+/.turbo/
+
+# stray Next.js build output (if the contents of .next/ ever land in the repo root)
+/BUILD_ID
+/trace
+/trace-build
+/turbopack
+/.previewinfo
+/.rscinfo
+/*-manifest.json
+/*-manifest.js
+/*.nft.json
+/required-server-files.*

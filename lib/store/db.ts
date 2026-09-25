@@ -13,8 +13,11 @@ export interface StoreState {
   session: Session | null;
 }
 
-const DB_KEY = "reading-challenge:db:v1";
-const SESSION_KEY = "reading-challenge:session:v1";
+// Bump the version (here and in `Database["version"]`) whenever the seed or the
+// schema changes; browsers holding older data are then re-seeded.
+const DB_VERSION = 2;
+const DB_KEY = `reading-challenge:db:v${DB_VERSION}`;
+const SESSION_KEY = `reading-challenge:session:v${DB_VERSION}`;
 
 let state: StoreState | null = null;
 let loading: Promise<void> | null = null;
@@ -55,7 +58,7 @@ function readState(db: Database): StoreState {
 
 async function load() {
   let db = read<Database>(DB_KEY);
-  if (db?.version !== 1) {
+  if (db?.version !== DB_VERSION) {
     db = await createSeedDb();
     write(DB_KEY, db);
   }

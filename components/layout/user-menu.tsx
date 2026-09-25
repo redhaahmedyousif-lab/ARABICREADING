@@ -5,11 +5,12 @@ import { useApp } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 
 export function UserMenu() {
-  const { ready, role, currentStudent, actions } = useApp();
+  const { ready, db, role, currentStudent, actions } = useApp();
   if (!ready || !role) return null;
 
-  const name = role === "teacher" ? "المعلم المشرف" : (currentStudent?.name ?? "");
-  const initials = role === "teacher" ? "م" : name.trim().charAt(0);
+  const name = role === "teacher" ? db.teacher.name : (currentStudent?.name ?? "");
+  // Skip honorifics ("أستاذ") so the avatar shows the person's own initial.
+  const initials = name.replace(/^(أستاذ|أستاذة|الأستاذ|الأستاذة)\s+/, "").trim().charAt(0);
 
 
   // AuthGuard sends the user to /login once the session is cleared.

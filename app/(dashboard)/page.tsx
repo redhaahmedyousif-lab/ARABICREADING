@@ -40,7 +40,7 @@ const QUICK_LINKS: { href: string; title: string; description: string; icon: typ
 ];
 
 export default function OverviewPage() {
-  const { db, role } = useSignedIn();
+  const { db, role, currentStudent } = useSignedIn();
 
   const leaderboard = getLeaderboard(db);
   const totalBooks = leaderboard.reduce((sum, e) => sum + e.stats.completedBooks, 0);
@@ -60,7 +60,7 @@ export default function OverviewPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="مرحباً بعودتك 👋"
+        eyebrow={`مرحباً ${role === "teacher" ? db.teacher.name : (currentStudent?.name ?? "")} 👋`}
         title="نظرة عامة على التحدي"
         description="نشاط الصف هذا الأسبوع، وترتيب القرّاء، وأحدث المقترحات."
         actions={

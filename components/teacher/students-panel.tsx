@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound, RefreshCw, UserPlus } from "lucide-react";
+import { KeyRound, RefreshCw, Trash2, UserPlus, Users } from "lucide-react";
 import { useSignedIn } from "@/context/AppContext";
 import { MIN_PASSWORD_LENGTH, generatePassword } from "@/lib/auth/crypto";
 import { getStudentStats } from "@/lib/stats";
@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
   CopyButton,
+  EmptyState,
   Field,
   Input,
 } from "@/components/ui";
@@ -84,7 +85,9 @@ function CreateStudentForm({ onCreated }: { onCreated: (creds: IssuedCredentials
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Field label="اسم الطالب">
-            {(id) => <Input id={id} required value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: ليلى محمود" />}
+            {(id) => (
+              <Input id={id} required value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: ليلى محمود" />
+            )}
           </Field>
           <Field label="اسم المستخدم" hint="أحرف إنجليزية صغيرة وأرقام و(_ .) — من 3 إلى 20 حرفاً.">
             {(id) => (
@@ -113,7 +116,12 @@ function CreateStudentForm({ onCreated }: { onCreated: (creds: IssuedCredentials
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
-                <Button variant="secondary" size="icon" onClick={() => setPassword(generatePassword())} aria-label="توليد كلمة مرور جديدة">
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  onClick={() => setPassword(generatePassword())}
+                  aria-label="توليد كلمة مرور جديدة"
+                >
                   <RefreshCw className="size-4" aria-hidden />
                 </Button>
               </div>
@@ -133,13 +141,25 @@ function CreateStudentForm({ onCreated }: { onCreated: (creds: IssuedCredentials
 export function StudentsPanel() {
   const { db, actions } = useSignedIn();
   const [issued, setIssued] = useState<IssuedCredentials | null>(null);
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  // Destructive row actions need a second click; only one row confirms at a time.
+  const [confirming, setConfirming] = useState<{ id: string; action: "reset" | "delete" } | null>(null);
+  const [notice, setNotice] = useState("");
 
   const resetPassword = async (studentId: string) => {
     const student = db.students.find((s) => s.id === studentId);
     const result = await actions.resetStudentPassword(studentId);
-    setConfirmingId(null);
+    setConfirming(null);
     if (result.ok && student) setIssued({ name: student.name, username: student.username, password: result.data.password });
+  };
+
+  const deleteStudent = (studentId: string) => {
+    const student = db.students.find((s) => s.id === studentId);
+    const result = actions.deleteStudent(studentId);
+    setConfirming(null);
+    if (result.ok && student) {
+      if (issued?.username === student.username) setIssued(null);
+      setNotice(`حُذف حساب ${student.name}.`);
+    }
   };
 
   return (
@@ -151,60 +171,101 @@ export function StudentsPanel() {
         </CardHeader>
         <CardContent className="space-y-4">
           {issued && <CredentialsNotice creds={issued} onDismiss={() => setIssued(null)} />}
+          {notice && !issued && <Alert tone="info">{notice}</Alert>}
 
-          <div className="-mx-5 overflow-x-auto sm:-mx-6">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs text-subtle">
-                  <th scope="col" className="px-5 pb-3 text-start font-medium sm:px-6">الطالب</th>
-                  <th scope="col" className="hidden px-3 pb-3 text-center font-medium sm:table-cell">كتب منجزة</th>
-                  <th scope="col" className="hidden px-3 pb-3 text-center font-medium sm:table-cell">التتابع</th>
-                  <th scope="col" className="hidden px-3 pb-3 text-center font-medium md:table-cell">النقاط</th>
-                  <th scope="col" className="px-5 pb-3 text-end font-medium sm:px-6">
-                    <span className="sr-only">إجراءات</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {db.students.map((student) => {
-                  const stats = getStudentStats(student, db.requests);
-                  const confirming = confirmingId === student.id;
-                  return (
-                    <tr key={student.id} className="border-b border-border last:border-0">
-                      <td className="px-5 py-3 sm:px-6">
-                        <p className="font-semibold text-foreground">{student.name}</p>
-                        <p dir="ltr" className="text-end font-mono text-xs text-subtle">
-                          @{student.username}
-                        </p>
-                      </td>
-                      <td className="hidden px-3 py-3 text-center text-muted tabular-nums sm:table-cell">{stats.completedBooks}</td>
-                      <td className="hidden px-3 py-3 text-center text-muted tabular-nums sm:table-cell">🔥 {stats.currentStreak}</td>
-                      <td className="hidden px-3 py-3 text-center font-semibold text-foreground tabular-nums md:table-cell">{stats.points}</td>
-                      <td className="px-5 py-3 sm:px-6">
-                        <div className="flex justify-end gap-1.5">
-                          {confirming ? (
-                            <>
-                              <Button variant="danger" size="sm" onClick={() => resetPassword(student.id)}>
-                                تأكيد
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => setConfirmingId(null)}>
-                                إلغاء
-                              </Button>
-                            </>
-                          ) : (
-                            <Button variant="secondary" size="sm" onClick={() => setConfirmingId(student.id)}>
-                              <KeyRound className="size-3.5" aria-hidden />
-                              إعادة تعيين كلمة المرور
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {db.students.length === 0 ? (
+            <EmptyState icon={Users} title="لا يوجد طلاب" description="أنشئ أول حساب طالب من النموذج." />
+          ) : (
+            <div className="-mx-5 overflow-x-auto sm:-mx-6">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs text-subtle">
+                    <th scope="col" className="px-5 pb-3 text-start font-medium sm:px-6">
+                      الطالب
+                    </th>
+                    <th scope="col" className="hidden px-3 pb-3 text-center font-medium sm:table-cell">
+                      كتب منجزة
+                    </th>
+                    <th scope="col" className="hidden px-3 pb-3 text-center font-medium sm:table-cell">
+                      التتابع
+                    </th>
+                    <th scope="col" className="hidden px-3 pb-3 text-center font-medium md:table-cell">
+                      النقاط
+                    </th>
+                    <th scope="col" className="px-5 pb-3 text-end font-medium sm:px-6">
+                      <span className="sr-only">إجراءات</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {db.students.map((student) => {
+                    const stats = getStudentStats(student, db.requests);
+                    const pending = confirming?.id === student.id ? confirming.action : null;
+                    return (
+                      <tr key={student.id} className="border-b border-border last:border-0">
+                        <td className="px-5 py-3 sm:px-6">
+                          <p className="font-semibold text-foreground">{student.name}</p>
+                          <p dir="ltr" className="text-end font-mono text-xs text-subtle">
+                            @{student.username}
+                          </p>
+                        </td>
+                        <td className="hidden px-3 py-3 text-center text-muted tabular-nums sm:table-cell">
+                          {stats.completedBooks}
+                        </td>
+                        <td className="hidden px-3 py-3 text-center text-muted tabular-nums sm:table-cell">
+                          🔥 {stats.currentStreak}
+                        </td>
+                        <td className="hidden px-3 py-3 text-center font-semibold text-foreground tabular-nums md:table-cell">
+                          {stats.points}
+                        </td>
+                        <td className="px-5 py-3 sm:px-6">
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            {pending ? (
+                              <>
+                                <span className="text-xs text-muted">
+                                  {pending === "delete" ? "حذف الحساب وكل بياناته؟" : "إصدار كلمة مرور جديدة؟"}
+                                </span>
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={() => (pending === "delete" ? deleteStudent(student.id) : resetPassword(student.id))}
+                                >
+                                  {pending === "delete" ? "تأكيد الحذف" : "تأكيد"}
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => setConfirming(null)}>
+                                  إلغاء
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => setConfirming({ id: student.id, action: "reset" })}
+                                >
+                                  <KeyRound className="size-3.5" aria-hidden />
+                                  إعادة تعيين كلمة المرور
+                                </Button>
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={() => setConfirming({ id: student.id, action: "delete" })}
+                                  aria-label={`حذف ${student.name}`}
+                                >
+                                  <Trash2 className="size-3.5" aria-hidden />
+                                  حذف
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
